@@ -1,0 +1,90 @@
+# .NET
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+*.user
+*.suo
+*.cache
+*.log
+
+# NuGet
+*.nupkg
+.nuget/
+packages/
+
+# Visual Studio
+.vs/
+*.sln.docstates
+*.pidb
+*.userprefs
+
+# Rider
+.idea/
+*.sln.iml
+
+# VS Code
+.vscode/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Test results
+TestResults/
+*.trx
+coverage*/
+
+# Unity (for future integration)
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+# Unity-generated project files (keep .csproj/.sln for standalone .NET)
+# *.csproj
+# *.unityproj
+# *.sln
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Unity asset meta files (keep these in version control)
+# *.meta
+
+# Crashlytics
+crashlytics-build.properties
+sysinfo.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets (never commit)
+*.env
+*.local
+appsettings.*.json
+!appsettings.json
+credentials.json
+secrets.json

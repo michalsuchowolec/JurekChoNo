@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hex Tester</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+:root { --bg:#0b0b12; --surf:#12121c; --bdr:#222232; --text:#c0c0e0; --muted:#42425e; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'JetBrains Mono',monospace; display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+#tabs { display:flex; background:var(--surf); border-bottom:1px solid var(--bdr); flex-shrink:0; }
+.tab { flex:1; padding:8px 4px; font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; text-align:center; cursor:pointer; color:var(--muted); border-bottom:2px solid transparent; user-select:none; }
+.tab.on { color:#9080f8; border-bottom-color:#9080f8; }
+
+canvas { flex:1; display:block; cursor:crosshair; min-height:0; }
+
+#bot { background:var(--surf); border-top:1px solid var(--bdr); padding:7px 12px; display:flex; align-items:center; gap:8px; flex-shrink:0; flex-wrap:wrap; min-height:46px; }
+.orow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; width:100%; }
+.op { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; padding:3px 10px; border-radius:4px; border:1px solid var(--bdr); background:var(--bg); color:var(--muted); cursor:pointer; text-transform:uppercase; }
+.op.on { background:#1c1848; color:#a090f8; border-color:#6050c0; }
+.op:hover { border-color:#605888; }
+.info { font-size:10px; color:var(--muted); }
+.info b { color:var(--text); font-weight:normal; }
+.small { font-size:9px; color:#2e2e4a; margin-left:auto; white-space:nowrap; }
+#clr { font-family:'JetBrains Mono',monospace; font-size:10px; padding:3px 10px; border-radius:4px; border:1px solid var(--bdr); background:var(--bg); color:var(--muted); cursor:pointer; }
+#clr:hover { border-color:#f05878; color:#f05878; }
+.sep { color:var(--bdr); }
+</style>
+</head>
+<body>
+
+<div id="tabs">
+  <div class="tab on" data-tab="define">1 · Define</div>
+  <div class="tab" data-tab="operate">2 · Operate</div>
+</div>
+
+<canvas id="c"></canvas>
+
+<div id="bot">
+  <div class="orow" id="bot-d">
+    <button id="clr">Clear</button>
+    <span class="info" id="d-count">0 tiles</span>
+    <span class="small">click: off → Up → UpRight → ↻ → off</span>
+  </div>
+  <div class="orow" id="bot-o" style="display:none">
+    <button class="op on" data-op="rebase">Rebase</button>
+    <button class="op" data-op="offset">Offset</button>
+    <button class="op" data-op="rotate">Rotate</button>
+    <span class="sep">|</span>
+    <span class="info">base <b id="bval"></b></span>
+    <span class="small">grid = move base · selection = rotate base</span>
+  </div>
+</div>
+
+<script>
+// ── Hex math (mirrors Game.Core C#) ──────────────────────────────────
+const SQ3   = Math.sqrt(3);
+const GRID_R = 3;
+const DIRS  = ['Up','UpRight','DownRight','Down','DownLeft','UpLeft'];
+const OFF   = [[0,1],[1,0],[1,-1],[0,-1],[-1,0],[-1,1]];
+
+// Per-direction: [stroke, darkFill]
+const DC = [
+  ['#5a9cf6','#0c1c38'], // Up        – blue
+  ['#30d898','#07251c'], // UpRight   – teal
+  ['#a8d840','#18230e'], // DownRight – lime
+  ['#f0a030','#261806'], // Down      – orange
+  ['#f05070','#26080c'], // DownLeft  – rose
+  ['#9870f0','#180820'], // UpLeft    – violet
+];
+
+// Output colour per operation
+const OP_C = { offset:'#38c8f0', rotate:'#a060f0', rebase:'#f0b030' };
+// Operation description (for bottom strip)
+const OP_D = {
+  offset: 'position only — result.pos = base.pos + sel.pos',
+  rotate: 'direction only — result = rotate(sel, base.dir)',
+  rebase: 'full rebase — result = rotate(sel, base.dir) + base.pos',
+};
+
+function hexDist(ax,ay,bx,by){const dx=bx-ax,dy=by-ay;return(Math.abs(dx)+Math.abs(dy)+Math.abs(dx+dy))>>1;}
+function rotateCW(x,y){return[x+y,-x];}
+function rotatePos(x,y,s){s=((s%6)+6)%6;let p=[x,y];for(let i=0;i<s;i++)p=rotateCW(p[0],p[1]);return p;}
+function rotateDir(d,s){return((d+s%6+6)%6);}
+
+// ── Layout cache ──────────────────────────────────────────────────────
+const L = {s:36, cx:200, cy:200};
+function updateLayout(){
+  const bh = document.getElementById('bot').offsetHeight || 46;
+  const th = document.getElementById('tabs').offsetHeight || 30;
+  const W  = window.innerWidth;
+  const H  = Math.max(60, window.innerHeight - bh - th);
+  L.s  = Math.max(16, Math.min(W*0.42/(1.5*GRID_R+1), H*0.42/(SQ3*GRID_R+0.5), 58));
+  L.cx = W / 2;
+  L.cy = H / 2;
+}
+
+function h2s(x,y){return[L.cx + L.s*1.5*x,  L.cy - L.s*SQ3*(y + x*0.5)];}
+function s2h(px,py){
+  const rx=(px-L.cx)/(L.s*1.5);
+  const ry=-(py-L.cy)/(L.s*SQ3)-rx*0.5;
+  const fz=-rx-ry;
+  let rx2=Math.round(rx),ry2=Math.round(ry),rz=Math.round(fz);
+  const dx=Math.abs(rx2-rx),dy=Math.abs(ry2-ry),dz=Math.abs(rz-fz);
+  if(dx>dy&&dx>dz)rx2=-ry2-rz;else if(dy>dz)ry2=-rx2-rz;
+  return[rx2,ry2];
+}
+
+function hexPts(sx,sy,r){
+  return Array.from({length:6},(_,i)=>[sx+r*Math.cos(i*Math.PI/3), sy+r*Math.sin(i*Math.PI/3)]);
+}
+function drawHex(ctx,sx,sy,fill,stroke,lw){
+  const pts=hexPts(sx,sy,L.s-1.5);
+  ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<6;i++)ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.closePath();ctx.fillStyle=fill;ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.fill();ctx.stroke();
+}
+function drawArrow(ctx,sx,sy,dir,color,alpha){
+  const[ox,oy]=OFF[dir];
+  const angle=Math.atan2(-L.s*SQ3*(oy+ox*0.5), L.s*1.5*ox);
+  const shaft=L.s*0.5, head=L.s*0.15;
+  const ex=sx+Math.cos(angle)*shaft, ey=sy+Math.sin(angle)*shaft;
+  ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.fillStyle=color;
+  ctx.lineWidth=2;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
+  ctx.save();ctx.translate(ex,ey);ctx.rotate(angle);
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-head,-head*.4);ctx.lineTo(-head,head*.4);
+  ctx.closePath();ctx.fill();ctx.restore();ctx.restore();
+}
+function drawLabel(ctx,sx,sy,txt,color,fsz){
+  ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font=`${fsz}px 'JetBrains Mono'`;ctx.fillStyle=color;ctx.fillText(txt,sx,sy);ctx.restore();
+}
+
+// ── State ─────────────────────────────────────────────────────────────
+const sel = new Map(); // "x,y" → direction 0-5
+let base   = {x:0, y:0, d:0};
+let curTab = 'define';
+let curOp  = 'rebase';
+
+function computeOutput(){
+  return [...sel.entries()].map(([key,dir])=>{
+    const[x,y]=key.split(',').map(Number);
+    if(curOp==='offset') return[base.x+x, base.y+y, dir];
+    const[rx,ry]=rotatePos(x,y,base.d), rd=rotateDir(dir,base.d);
+    if(curOp==='rotate') return[rx, ry, rd];
+    return[base.x+rx, base.y+ry, rd];
+  });
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const fsz    = () => Math.max(7, L.s * 0.22);
+
+function draw(){
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#0b0b12'; ctx.fillRect(0,0,W,H);
+
+  // Hex grid
+  const grid=[];
+  for(let x=-GRID_R;x<=GRID_R;x++)
+    for(let y=-GRID_R;y<=GRID_R;y++)
+      if(hexDist(0,0,x,y)<=GRID_R) grid.push([x,y]);
+
+  if(curTab==='define'){
+    for(const[x,y] of grid){
+      const[sx,sy]=h2s(x,y), key=`${x},${y}`;
+      if(sel.has(key)){
+        const d=sel.get(key);
+        drawHex(ctx,sx,sy, DC[d][1], DC[d][0], 2);
+        drawArrow(ctx,sx,sy, d, DC[d][0], 1);
+        drawLabel(ctx,sx,sy+L.s*0.3, `${x},${y}`, DC[d][0]+'80', fsz());
+      } else {
+        drawHex(ctx,sx,sy, '#161620', '#232333', 1);
+        drawLabel(ctx,sx,sy, `${x},${y}`, '#2a2a46', fsz());
+      }
+    }
+    document.getElementById('d-count').textContent =
+      `${sel.size} tile${sel.size!==1?'s':''}`;
+    return;
+  }
+
+  // ── Operate tab ──────────────────────────────────────────────────
+  const output = sel.size > 0 ? computeOutput() : [];
+  const opColor = OP_C[curOp];
+
+  // 1. Background grid
+  for(const[x,y] of grid){
+    const[sx,sy]=h2s(x,y);
+    drawHex(ctx,sx,sy, '#161620', '#1e1e30', 1);
+    drawLabel(ctx,sx,sy, `${x},${y}`, '#222238', fsz());
+  }
+
+  // 2. Output tiles (may be outside grid — drawn wherever they fall)
+  for(const[ox,oy,od] of output){
+    const[sx,sy]=h2s(ox,oy);
+    if(sx<-L.s||sx>W+L.s||sy<-L.s||sy>H+L.s) continue;
+    drawHex(ctx,sx,sy, opColor+'18', opColor, 2.5);
+    drawArrow(ctx,sx,sy, od, opColor, 1);
+    drawLabel(ctx,sx,sy+L.s*0.3, `${ox},${oy}`, opColor, fsz());
+  }
+
+  // 3. Selection tiles (dim source)
+  for(const[key,dir] of sel){
+    const[x,y]=key.split(',').map(Number), [sx,sy]=h2s(x,y);
+    drawHex(ctx,sx,sy, DC[dir][1]+'60', DC[dir][0]+'80', 1.5);
+    drawArrow(ctx,sx,sy, dir, DC[dir][0]+'90', 0.55);
+  }
+
+  // 4. Base transform (gold)
+  {
+    const[sx,sy]=h2s(base.x,base.y);
+    drawHex(ctx,sx,sy, '#201e08', '#c8a020', 2.5);
+    drawArrow(ctx,sx,sy, base.d, '#e8c030', 1);
+    ctx.save();ctx.beginPath();ctx.arc(sx,sy,L.s*0.1,0,Math.PI*2);
+    ctx.fillStyle='#c8a020';ctx.fill();ctx.restore();
+  }
+
+  document.getElementById('bval').textContent = `(${base.x},${base.y}) ${DIRS[base.d]}`;
+}
+
+// ── Resize ─────────────────────────────────────────────────────────────
+function resize(){
+  updateLayout();
+  const bh=document.getElementById('bot').offsetHeight||46;
+  const th=document.getElementById('tabs').offsetHeight||30;
+  canvas.width  = window.innerWidth;
+  canvas.height = Math.max(60, window.innerHeight - bh - th);
+  draw();
+}
+
+// ── Events ─────────────────────────────────────────────────────────────
+canvas.addEventListener('click', e=>{
+  const[hx,hy]=s2h(e.clientX, e.clientY);
+  if(curTab==='define'){
+    const key=`${hx},${hy}`;
+    const cur=sel.get(key);
+    if(cur===undefined)    sel.set(key, 0);
+    else if(cur===5)       sel.delete(key);
+    else                   sel.set(key, cur+1);
+  } else {
+    if(sel.has(`${hx},${hy}`)) base.d=(base.d+1)%6;
+    else                       { base.x=hx; base.y=hy; }
+  }
+  draw();
+});
+
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    curTab=t.dataset.tab;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===t));
+    document.getElementById('bot-d').style.display = curTab==='define'?'flex':'none';
+    document.getElementById('bot-o').style.display = curTab==='operate'?'flex':'none';
+    draw();
+  });
+});
+
+document.querySelectorAll('.op').forEach(b=>{
+  b.addEventListener('click',()=>{
+    curOp=b.dataset.op;
+    document.querySelectorAll('.op').forEach(x=>x.classList.toggle('on',x===b));
+    draw();
+  });
+});
+
+document.getElementById('clr').addEventListener('click',()=>{ sel.clear(); draw(); });
+
+window.addEventListener('resize', resize);
+requestAnimationFrame(()=>requestAnimationFrame(resize));
+</script>
+</body>
+</html>
