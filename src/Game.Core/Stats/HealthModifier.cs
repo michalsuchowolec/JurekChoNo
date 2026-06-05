@@ -26,7 +26,6 @@ public abstract class HealthModifier : Modifier<Health>{
 
 public class DamageModifier : HealthModifier{
     public new HealthModifierType Type = HealthModifierType.Damage;
-
     public int Amount;
 
     public DamageModifier(int amount, TimeStamp timeStamp, bool isAura){

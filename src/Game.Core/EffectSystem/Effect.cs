@@ -1,9 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using Game.Core;
+using MatchEngine;
 
 public abstract class Effect{
-    public abstract void Enable(MatchEngine engine);
-    public abstract void Disable(MatchEngine engine);
+    public abstract void Enable(GameEventSystem events);
+    public abstract void Disable(GameEventSystem events);
     public string Type = "";
 }
 
@@ -20,19 +21,18 @@ public class DamageEffect : Effect
         Damage = damage;
         TimeStamp = timeStamp;
     }
-    public override void Disable(MatchEngine engine)
+    public override void Disable(GameEventSystem events)
     {
-        engine.StatsEvaluator.CollectingHealthModifiers += ProvideModifier; 
+        events.CollectingHealthModifiers -= ProvideModifier;
     }
 
-    public override void Enable(MatchEngine engine)
+    public override void Enable(GameEventSystem events)
     {
-        engine.StatsEvaluator.CollectingHealthModifiers -= ProvideModifier;
+        events.CollectingHealthModifiers += ProvideModifier;
     }
-
-    private void ProvideModifier(Unit unit, List<Modifier<int>> modifiers){
+    private void ProvideModifier(Unit unit, IList<Modifier<Health>> modifiers){
         if(Unit == unit){
-            modifiers.Add(new AddModifier(-Damage, TimeStamp, false));
+            modifiers.Add(new DamageModifier(-Damage, TimeStamp, false));
         }
     }
 }
@@ -49,25 +49,25 @@ public class HealthAOEAura : Effect
         Health = health;
         Area = area;
     }
-    public override void Disable(MatchEngine engine)
+    public override void Disable(GameEventSystem events)
     {
-        engine.StatsEvaluator.CollectingHealthModifiers += ProvideModifier; 
+        events.CollectingHealthModifiers -= ProvideModifier;
     }
 
-    public override void Enable(MatchEngine engine)
+    public override void Enable(GameEventSystem events)
     {
-        engine.StatsEvaluator.CollectingHealthModifiers -= ProvideModifier;
+        events.CollectingHealthModifiers += ProvideModifier;
     }
 
-    private void ProvideModifier(Unit unit, List<Modifier<int>> modifiers){
+    private void ProvideModifier(Unit unit, IList<Modifier<Health>> modifiers){
         if(DoesOverlap(unit)){
-            modifiers.Add(new AddModifier(Health, new(), true));
+            modifiers.Add(new BuffModifier(Health, new(), true));
         }
     }
 
     private bool DoesOverlap(Unit unit){
         foreach(var position in Area){
-            var posTrans = new HexTransform(position, HexDirection.Up); 
+            var posTrans = new HexTransform(position, HexDirection.Up);
             if(posTrans.Rebase(Source.Transform.BaseValue).Position == unit.Transform.BaseValue.Position) return true;
         }
         return false;
@@ -77,24 +77,24 @@ public class HealthAOEAura : Effect
 }
 
 public class DOTEffect : Effect{
-    private string _type = "DOT"; 
+    private string _type = "DOT";
     private Unit _unit;
     private int _damage;
-    public DOTEffect(Unit unit, int damage, MatchEngine engine){
+    public DOTEffect(Unit unit, int damage){
         _unit = unit;
         _damage = damage;
     }
-    public override void Enable(MatchEngine engine)
+    public override void Enable(GameEventSystem events)
     {
-        engine.Events.TurnEnded += (turn) => DamageUnit(engine, turn);
+        //events.TurnEnded += (turn) => DamageUnit(events, turn);
     }
 
-    public override void Disable(MatchEngine engine)
+    public override void Disable(GameEventSystem events)
     {
-        
+
     }
 
-    private void DamageUnit(MatchEngine engine, int turn){
+    private void DamageUnit(GameEventSystem events, int turn){
 
     }
 

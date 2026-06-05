@@ -2,7 +2,7 @@ using Game.Core;
 
 
 public class Unit{
-    public Stat<int> Health;
+    public Stat<Health> Health;
     public Stat<int> Speed;
     public Stat<int> Attack;
     public Stat<HexTransform> Transform;

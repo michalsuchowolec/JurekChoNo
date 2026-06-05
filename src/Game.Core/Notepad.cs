@@ -1,54 +1,21 @@
+using System.ComponentModel;
+using System.Data;
 using System.Reflection.Metadata.Ecma335;
 using Game.Core;
+using MatchEngine;
 
 public class MatchRoot{
     public MatchState MatchState;
-    public MatchEngine MatchEngine;
+    public MomentResolver? MomentResolver;
 
 }
 
-public class TurnResolver{
-
-}
 
 
 public class MatchState{
     
 
 }
-
-public class MatchEngine{
-    public TurnResolver TurnResolver = new();
-    public StatsEvaluator StatsEvaluator = new();
-    public EventsSystem Events = new();
-}
-
-
-public class StatsEvaluator{
-    public event Action<Unit, List<Modifier<int>>>? CollectingHealthModifiers;
-    public int CalculateHealth(Unit unit){
-        List<Modifier<int>> modifiers = new();
-        CollectingHealthModifiers?.Invoke(unit, modifiers);
-        modifiers.Sort();
-        return unit.Health.Evaluate(modifiers);
-    }
-
-
-}
-
-
-public class EventsSystem{
-    public event Action<int> TurnEnded;
-
-
-}
-
-
-
-
-
-
-
 
 
 
@@ -58,12 +25,6 @@ public enum StatOwner{
     Intent,
     Effect
 }
-
-
-
-
-
-
 
 
 
