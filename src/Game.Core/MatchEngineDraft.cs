@@ -28,9 +28,14 @@ public  class MomentResolver{ //handles a single automatic moment resolution
     private ZoneChangeResolver _zoneChangeResolver;
     private SummoningResolver _summoningResolver;
     private MovementResolver _movementResolver;
-
     private MatchState _matchState;
     private readonly GameEventSystem _events;
+
+    private readonly TimeStampTracker _timeStampTracker;
+    public GameEventSystem Events => _events;
+    public EffectsTracker Effects => _effectsTracker;
+
+    public TimeStamp Now => _timeStampTracker.Now;
 
     public MomentResolver(MatchState matchState){
         _matchState = matchState;
@@ -40,12 +45,14 @@ public  class MomentResolver{ //handles a single automatic moment resolution
         _zoneChangeResolver = new ZoneChangeResolver();
         _summoningResolver = new SummoningResolver();
         _movementResolver = new MovementResolver(matchState, _events);
+        
+
     }
 
     public void ResolveMoment(){
         while(true){
             if(_effectsTracker.RealizeEffects()) continue;
-            if(_intentsResolver.RealizeIntents()) continue;
+            if(_intentsResolver.RealizeIntents(this)) continue;
             if(_zoneChangeResolver.ProcessZoneChanges(_matchState)) continue;
             if(_summoningResolver.ProcessSummons(_matchState)) continue;
             if(_movementResolver.ProcessMovement(_matchState)) continue;
@@ -57,9 +64,7 @@ public  class MomentResolver{ //handles a single automatic moment resolution
 public class TimeStampTracker
 {
     private TimeStamp _currentTimeStamp;
-    public TimeStamp Current => _currentTimeStamp;
-
-
+    public TimeStamp Now => _currentTimeStamp;
     public void IncrementMoment()
     {
         _currentTimeStamp = new TimeStamp
@@ -103,8 +108,6 @@ public class TimeStampTracker
             Moment = 0
         };
     }
-
-
 }
 
 
@@ -198,12 +201,12 @@ public class IntentsResolver{
         _queuedIntents.Add(intent);
     }
 
-    public bool RealizeIntents(){
+    public bool RealizeIntents(MomentResolver resolver){
         _activeIntents = _queuedIntents;
         _queuedIntents = new();
         if(_activeIntents.Count == 0) return false;
         foreach(var intent in _activeIntents){
-            intent.Perform();
+            intent.Perform(resolver);
         }
         return true;
     }
@@ -211,16 +214,28 @@ public class IntentsResolver{
 
 public class GameEventSystem{
     public event Action<Unit, IList<Modifier<Health>>>? CollectingHealthModifiers;
-    public event Action<Unit, Unit, IList<Modifier<int>>>? CollectIntentDamage;
+    public event Action<Intent>? CollectingIntentDamage;
     public event Action<Unit, IList<Modifier<HexTransform>>>? CollectIntentArea;
     public event Action<Unit, HexTransform>? MovementRequested;
-    internal void RaiseCollectingHealthModifiers(Unit unit, IList<Modifier<Health>> modifiers){
+
+    public event Action<Intent>? DamageDone;
+    public void RaiseCollectingHealthModifiers(Unit unit, IList<Modifier<Health>> modifiers){
         CollectingHealthModifiers?.Invoke(unit, modifiers);
     }
-
+    public void RaiseCollectIntentDamageModifiers(Intent intent){
+        CollectingIntentDamage?.Invoke(intent);
+    }
+    public void RaiseDamageDone(Intent intent)
+    {
+        DamageDone?.Invoke(intent);
+    }
     public void RequestMovement(Unit unit, HexTransform transform){
         MovementRequested?.Invoke(unit, transform);
     }
+
+    
+
+    
 }
 
 public class StatsEvaluator{

@@ -69,24 +69,24 @@ public readonly record struct HexPos(int X, int Y)
 public static class HexDirectionExt
 {
     public static readonly HexDirection[] All =
-    [
+    {
         HexDirection.Up,
         HexDirection.UpRight,
         HexDirection.DownRight,
         HexDirection.Down,
         HexDirection.DownLeft,
-        HexDirection.UpLeft,
-    ];
+        HexDirection.UpLeft
+    };
 
     private static readonly HexPos[] Offsets =
-    [
+    {
         new( 0,  1),  // Up
         new( 1,  0),  // UpRight
         new( 1, -1),  // DownRight
         new( 0, -1),  // Down
         new(-1,  0),  // DownLeft
-        new(-1,  1),  // UpLeft
-    ];
+        new(-1,  1)  // UpLeft
+    };
 
     public static HexPos ToOffset(this HexDirection dir) => Offsets[(int)dir];
 

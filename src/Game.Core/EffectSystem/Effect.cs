@@ -21,14 +21,13 @@ public class DamageEffect : Effect
         Damage = damage;
         TimeStamp = timeStamp;
     }
-    public override void Disable(GameEventSystem events)
-    {
-        events.CollectingHealthModifiers -= ProvideModifier;
-    }
-
     public override void Enable(GameEventSystem events)
     {
         events.CollectingHealthModifiers += ProvideModifier;
+    }
+    public override void Disable(GameEventSystem events)
+    {
+        events.CollectingHealthModifiers -= ProvideModifier;
     }
     private void ProvideModifier(Unit unit, IList<Modifier<Health>> modifiers){
         if(Unit == unit){
