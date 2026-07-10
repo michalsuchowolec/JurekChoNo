@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Hex Pose Modifier Tester</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg:#0b0b12; --surf:#12121c; --bdr:#222232; --text:#c0c0e0; --muted:#42425e;
+  --blue:#5a9cf6; --green:#30d898; --purple:#9870f0; --gold:#e0c040;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;display:flex;height:100vh;overflow:hidden;font-size:11px;}
+
+/* ── Board panel ── */
+.board-panel{flex:1;display:flex;flex-direction:column;min-width:0;border-right:1px solid var(--bdr);}
+.board-header{background:var(--surf);border-bottom:1px solid var(--bdr);padding:7px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.board-header h2{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;}
+.pose-displays{display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end;}
+.pose-box{font-size:10px;padding:2px 8px;border-radius:3px;border:1px solid;white-space:nowrap;}
+.pose-box.initial{border-color:var(--blue);color:var(--blue);}
+.pose-box.final{border-color:var(--green);color:var(--green);}
+.pose-arrow{color:var(--muted);}
+canvas{flex:1;display:block;cursor:crosshair;min-height:0;}
+.board-footer{background:var(--surf);border-top:1px solid var(--bdr);padding:4px 12px;font-size:9px;color:var(--muted);flex-shrink:0;display:flex;align-items:center;gap:16px;}
+.dir-btns{display:flex;align-items:center;gap:4px;}
+.dir-btn{background:var(--bg);border:1px solid var(--bdr);color:var(--muted);font-family:inherit;font-size:9px;padding:2px 7px;border-radius:3px;cursor:pointer;}
+.dir-btn:hover{border-color:var(--blue);color:var(--blue);}
+.dir-btn.active{background:#0c1c38;border-color:var(--blue);color:var(--blue);}
+.footer-hint{color:var(--muted);margin-left:auto;}
+
+/* ── Control panel ── */
+.control-panel{width:350px;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;}
+.section-header{background:var(--surf);border-bottom:1px solid var(--bdr);padding:5px 10px;font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+
+/* Palette */
+.palette-section{border-bottom:1px solid var(--bdr);flex-shrink:0;}
+.palette-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:6px;}
+.mod-card{padding:5px 8px;border-radius:3px;border:1px solid var(--bdr);background:var(--bg);cursor:grab;user-select:none;transition:border-color .12s,background .12s;}
+.mod-card:hover{background:var(--surf);}
+.mod-card:active{cursor:grabbing;}
+.card-type{font-weight:600;font-size:10px;margin-bottom:1px;}
+.card-desc{font-size:8px;color:var(--muted);line-height:1.3;}
+
+/* Active modifiers */
+.active-section{flex:1;display:flex;flex-direction:column;min-height:0;}
+.drop-zone{flex:1;overflow-y:auto;padding:4px;min-height:0;}
+.drop-zone.drag-over{background:#14142a;}
+.drop-hint{display:flex;align-items:center;justify-content:center;height:56px;font-size:9px;color:var(--muted);border:1px dashed var(--bdr);border-radius:3px;margin:2px;}
+.mod-item{border:1px solid var(--bdr);border-radius:3px;margin-bottom:3px;background:var(--bg);overflow:hidden;}
+.mod-item-header{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--surf);}
+.step-badge{font-size:9px;font-weight:600;min-width:14px;text-align:center;}
+.mod-item-type{font-size:10px;font-weight:600;flex:1;}
+.mod-item-remove{background:none;border:none;color:var(--muted);font-family:inherit;font-size:10px;cursor:pointer;padding:0 2px;line-height:1;}
+.mod-item-remove:hover{color:#f05878;}
+.mod-item-params{padding:5px 8px;display:flex;flex-direction:column;gap:3px;}
+.param-row{display:flex;align-items:center;gap:5px;}
+.param-label{color:var(--muted);font-size:8px;min-width:55px;}
+.param-input{background:var(--surf);border:1px solid var(--bdr);color:var(--text);font-family:inherit;font-size:10px;padding:2px 5px;border-radius:2px;width:56px;}
+.param-input:focus{outline:none;border-color:var(--purple);}
+.param-select{background:var(--surf);border:1px solid var(--bdr);color:var(--text);font-family:inherit;font-size:9px;padding:2px 4px;border-radius:2px;}
+.param-select:focus{outline:none;border-color:var(--purple);}
+
+/* Eval summary */
+.eval-section{background:var(--surf);border-top:1px solid var(--bdr);padding:7px 10px;flex-shrink:0;}
+.eval-row{display:flex;align-items:baseline;gap:6px;margin-bottom:2px;}
+.eval-lbl{color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.06em;min-width:55px;}
+.eval-val{font-size:10px;}
+.eval-val.changed{color:var(--green);}
+.eval-step{font-size:8px;color:var(--muted);margin-top:4px;line-height:1.6;}
+.eval-step span{color:#7050c0;}
+</style>
+</head>
+<body>
+
+<div class="board-panel">
+  <div class="board-header">
+    <h2>Hex Modifier Tester</h2>
+    <div class="pose-displays">
+      <div class="pose-box initial" id="pose-initial">—</div>
+      <span class="pose-arrow">→</span>
+      <div class="pose-box final" id="pose-final">—</div>
+    </div>
+  </div>
+  <canvas id="board"></canvas>
+  <div class="board-footer">
+    <span>Direction:</span>
+    <div class="dir-btns" id="dir-btns"></div>
+    <span class="footer-hint">click hex: move unit &nbsp;·&nbsp; right-click: cycle direction</span>
+  </div>
+</div>
+
+<div class="control-panel">
+  <div class="palette-section">
+    <div class="section-header">
+      <span>Modifier Palette</span>
+      <span style="font-weight:400">drag or click to add</span>
+    </div>
+    <div class="palette-grid" id="palette"></div>
+  </div>
+
+  <div class="active-section">
+    <div class="section-header">
+      <span>Active Modifiers</span>
+      <span id="mod-count" style="font-weight:400">0 modifiers</span>
+    </div>
+    <div class="drop-zone" id="modifier-list">
+      <div class="drop-hint" id="drop-hint">Drop modifiers here</div>
+    </div>
+  </div>
+
+  <div class="eval-section">
+    <div class="eval-row">
+      <span class="eval-lbl">Initial</span>
+      <span class="eval-val" id="eval-initial">—</span>
+    </div>
+    <div class="eval-row">
+      <span class="eval-lbl">Final</span>
+      <span class="eval-val" id="eval-final">—</span>
+    </div>
+    <div class="eval-step" id="eval-steps"></div>
+  </div>
+</div>
+
+<script>
+// ── Hex math (mirrors Game.Core C#) ─────────────────────────────────────
+const SQ3 = Math.sqrt(3);
+const GRID_R = 5;
+const DIR_NAMES = ['Up','UpRight','DownRight','Down','DownLeft','UpLeft'];
+const DIR_VECS  = [[0,1],[1,0],[1,-1],[0,-1],[-1,0],[-1,1]];
+
+function rotateCW([q,r])    { return [q+r,-q]; }
+function hexAdd([aq,ar],[bq,br]) { return [aq+bq,ar+br]; }
+function hexScale([q,r],f)  { return [q*f, r*f]; }
+
+function rotateN(pos,n) {
+  n=((n%6)+6)%6; for(let i=0;i<n;i++) pos=rotateCW(pos); return pos;
+}
+
+// HexPosition.Transform(origin, point): rotate point by origin.dir then offset
+function transformPos(pose, point) {
+  return hexAdd(pose.pos, rotateN(point, pose.dir));
+}
+
+// HexPose.RotateClockWiseAroundCenter
+function poseRotateCW(pose) {
+  return { pos: rotateCW(pose.pos), dir: (pose.dir+1)%6 };
+}
+function poseRotateN(pose,n) {
+  n=((n%6)+6)%6; for(let i=0;i<n;i++) pose=poseRotateCW(pose); return pose;
+}
+
+function hexDist(ax,ay,bx,by) {
+  const dx=bx-ax,dy=by-ay; return (Math.abs(dx)+Math.abs(dy)+Math.abs(dx+dy))>>1;
+}
+
+// ── Modifier metadata ────────────────────────────────────────────────────
+const MOD_TYPES = [
+  { type:'RotateStatic',       label:'Rotate Static',        priority:0, color:'#9870f0', defaults:{rotations:1},         desc:'Rotate direction only' },
+  { type:'RotateAroundCenter', label:'Rotate Around Center', priority:1, color:'#5a9cf6', defaults:{rotations:1},         desc:'Rotate pos + dir around origin' },
+  { type:'MoveRelative',       label:'Move Relative',        priority:2, color:'#30d898', defaults:{q:0,r:1},             desc:'Move in local (facing) space' },
+  { type:'MoveGlobal',         label:'Move Global',          priority:3, color:'#a8d840', defaults:{q:0,r:1},             desc:'Move in world space' },
+  { type:'MultiplyVelocity',   label:'Multiply Velocity',    priority:4, color:'#f0a030', defaults:{multiplier:2},        desc:'Scale position by int multiplier' },
+  { type:'SetRotation',        label:'Set Rotation',         priority:5, color:'#f05878', defaults:{dir:0},               desc:'Override facing direction' },
+  { type:'SetPosition',        label:'Set Position',         priority:6, color:'#38c8f0', defaults:{q:0,r:0},             desc:'Override position' },
+  { type:'SetPose',            label:'Set Pose',             priority:7, color:'#e0c040', defaults:{q:0,r:0,dir:0},       desc:'Override full pose' },
+];
+const MOD_META = Object.fromEntries(MOD_TYPES.map(m=>[m.type,m]));
+
+// ── Apply one modifier (mirrors C# Transform methods) ────────────────────
+function applyMod(pose, mod) {
+  switch(mod.type) {
+    case 'RotateStatic':
+      return { pos:pose.pos, dir:((pose.dir+mod.rotations)%6+6)%6 };
+    case 'RotateAroundCenter':
+      return poseRotateN(pose, mod.rotations);
+    case 'MoveRelative':
+      return { pos:transformPos(pose,[mod.q,mod.r]), dir:pose.dir };
+    case 'MoveGlobal':
+      return { pos:hexAdd(pose.pos,[mod.q,mod.r]), dir:pose.dir };
+    case 'MultiplyVelocity':
+      return { pos:hexScale(pose.pos,mod.multiplier), dir:pose.dir };
+    case 'SetRotation':
+      return { pos:pose.pos, dir:mod.dir };
+    case 'SetPosition':
+      return { pos:[mod.q,mod.r], dir:pose.dir };
+    case 'SetPose':
+      return { pos:[mod.q,mod.r], dir:mod.dir };
+  }
+}
+
+// Returns sorted modifier list and all intermediate states (index 0 = initial)
+function evalAll(initialPose, mods) {
+  const sorted = [...mods].sort((a,b)=>{
+    const pd = MOD_META[a.type].priority - MOD_META[b.type].priority;
+    return pd!==0 ? pd : a.ts-b.ts;
+  });
+  const states = [{ pos:[...initialPose.pos], dir:initialPose.dir }];
+  for(const mod of sorted) states.push(applyMod(states[states.length-1], mod));
+  return { sorted, states };
+}
+
+// ── State ────────────────────────────────────────────────────────────────
+let initialPose = { pos:[0,0], dir:0 };
+let activeMods  = [];
+let tsCounter   = 0;
+
+// ── Canvas / rendering ───────────────────────────────────────────────────
+const canvas = document.getElementById('board');
+const ctx    = canvas.getContext('2d');
+const L      = { s:36, cx:0, cy:0 };
+
+function updateLayout() {
+  L.cx = canvas.width/2;
+  L.cy = canvas.height/2;
+  L.s  = Math.max(14, Math.min(50, Math.min(canvas.width/(GRID_R*3+2), canvas.height/(GRID_R*SQ3*2+1))));
+}
+
+function h2s(q,r) { return [L.cx+L.s*1.5*q, L.cy-L.s*SQ3*(r+q*0.5)]; }
+
+function s2h(px,py) {
+  const rx=(px-L.cx)/(L.s*1.5);
+  const ry=-(py-L.cy)/(L.s*SQ3)-rx*0.5;
+  const fz=-rx-ry;
+  let rq=Math.round(rx), rr=Math.round(ry), rz=Math.round(fz);
+  const dq=Math.abs(rq-rx), dr=Math.abs(rr-ry), dz=Math.abs(rz-fz);
+  if(dq>dr&&dq>dz) rq=-rr-rz; else if(dr>dz) rr=-rq-rz;
+  return [rq,rr];
+}
+
+function drawHex(sx,sy,fill,stroke,lw) {
+  ctx.beginPath();
+  for(let i=0;i<6;i++){
+    const a=i*Math.PI/3, x=sx+(L.s-1.5)*Math.cos(a), y=sy+(L.s-1.5)*Math.sin(a);
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.closePath(); ctx.fillStyle=fill; ctx.strokeStyle=stroke; ctx.lineWidth=lw; ctx.fill(); ctx.stroke();
+}
+
+function drawArrow(sx,sy,dir,color,alpha=1,scale=1) {
+  const [oq,or_]=DIR_VECS[dir];
+  const angle=Math.atan2(-L.s*SQ3*(or_+oq*0.5), L.s*1.5*oq);
+  const shaft=L.s*0.5*scale, head=L.s*0.15*scale;
+  const ex=sx+Math.cos(angle)*shaft, ey=sy+Math.sin(angle)*shaft;
+  ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=color; ctx.fillStyle=color;
+  ctx.lineWidth=2*scale; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.stroke();
+  ctx.save(); ctx.translate(ex,ey); ctx.rotate(angle);
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-head,-head*.4); ctx.lineTo(-head,head*.4);
+  ctx.closePath(); ctx.fill(); ctx.restore(); ctx.restore();
+}
+
+function drawLabel(sx,sy,txt,color,fsz) {
+  ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font=`${fsz}px 'JetBrains Mono'`; ctx.fillStyle=color;
+  ctx.fillText(txt,sx,sy); ctx.restore();
+}
+
+function posKey(pos) { return `${Math.round(pos[0])},${Math.round(pos[1])}`; }
+
+function draw() {
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#0b0b12'; ctx.fillRect(0,0,W,H);
+
+  const fsz = Math.max(7, L.s*0.22);
+  const { sorted, states } = evalAll(initialPose, activeMods);
+  const ip = initialPose;
+  const fp = states[states.length-1];
+  const ipK = posKey(ip.pos), fpK = posKey(fp.pos);
+  const samePos = ipK === fpK;
+
+  // Background grid
+  const grid=[];
+  for(let q=-GRID_R;q<=GRID_R;q++)
+    for(let r=-GRID_R;r<=GRID_R;r++)
+      if(hexDist(0,0,q,r)<=GRID_R) grid.push([q,r]);
+
+  for(const [q,r] of grid) {
+    const [sx,sy]=h2s(q,r);
+    drawHex(sx,sy,'#161620','#232333',1);
+    drawLabel(sx,sy,`${q},${r}`,'#2a2a46',fsz);
+  }
+
+  // Intermediate states (step 1 to n-1)
+  for(let i=1; i<states.length-1; i++) {
+    const st=states[i];
+    const [sq,sr_]=st.pos.map(Math.round);
+    const [sx,sy]=h2s(sq,sr_);
+    drawArrow(sx,sy,st.dir,'#7050c0',0.7,0.65);
+    // Step badge
+    const bx=sx+L.s*0.38, by=sy-L.s*0.38, br=Math.max(6,L.s*0.14);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(bx,by,br,0,Math.PI*2);
+    ctx.fillStyle='#5030a0'; ctx.fill();
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font=`bold ${Math.max(6,L.s*0.13)}px 'JetBrains Mono'`;
+    ctx.fillStyle='#c0a0f8'; ctx.fillText(String(i),bx,by);
+    ctx.restore();
+  }
+
+  // Final pose hex (green) — only when different position from initial
+  if(!samePos) {
+    const [fq,fr_]=fp.pos.map(Math.round);
+    const [sx,sy]=h2s(fq,fr_);
+    drawHex(sx,sy,'#081a0e','#30d898',2.5);
+    drawArrow(sx,sy,fp.dir,'#30d898',1);
+    drawLabel(sx,sy+L.s*0.32,`${fq},${fr_}`,'#20804060',fsz);
+  }
+
+  // Initial pose hex (blue) — always on top
+  {
+    const [iq,ir_]=ip.pos.map(Math.round);
+    const [sx,sy]=h2s(iq,ir_);
+    drawHex(sx,sy,'#091428','#5a9cf6',2.5);
+    if(samePos && (activeMods.length>0)) {
+      // Same hex: draw final arrow (green) under initial
+      drawArrow(sx,sy,fp.dir,'#30d898',0.9,0.7);
+    }
+    drawArrow(sx,sy,ip.dir,'#5a9cf6',1);
+    drawLabel(sx,sy+L.s*0.32,`${iq},${ir_}`,'#2050a060',fsz);
+  }
+
+  // Legend (top-left of canvas)
+  ctx.save();
+  ctx.font=`${Math.max(7,L.s*0.2)}px 'JetBrains Mono'`;
+  ctx.fillStyle='#5a9cf6'; ctx.fillText('● initial',10,16);
+  ctx.fillStyle='#30d898'; ctx.fillText('● final',10,28);
+  if(activeMods.length>1) { ctx.fillStyle='#7050c0'; ctx.fillText('● step',10,40); }
+  ctx.restore();
+
+  // Update header & eval panel
+  const [iq2,ir2]=ip.pos; const [fq2,fr2]=fp.pos;
+  document.getElementById('pose-initial').textContent=`(${iq2},${ir2}) ${DIR_NAMES[ip.dir]}`;
+  document.getElementById('pose-final').textContent=`(${Math.round(fq2)},${Math.round(fr2)}) ${DIR_NAMES[fp.dir]}`;
+  document.getElementById('eval-initial').textContent=`(${iq2}, ${ir2})  dir=${ip.dir} (${DIR_NAMES[ip.dir]})`;
+  const evalFinal=document.getElementById('eval-final');
+  evalFinal.textContent=`(${Math.round(fq2)}, ${Math.round(fr2)})  dir=${fp.dir} (${DIR_NAMES[fp.dir]})`;
+  evalFinal.className='eval-val'+(samePos&&ip.dir===fp.dir?'':' changed');
+
+  // Evaluation steps
+  const stepsEl=document.getElementById('eval-steps');
+  if(sorted.length===0) { stepsEl.textContent=''; return; }
+  let html='';
+  for(let i=0;i<sorted.length;i++){
+    const mod=sorted[i], meta=MOD_META[mod.type];
+    const before=states[i], after=states[i+1];
+    html+=`<span style="color:${meta.color}">${i+1}.</span> ${meta.label} `
+        +`<span>(${posKey(before.pos)},${DIR_NAMES[before.dir]}) → (${posKey(after.pos)},${DIR_NAMES[after.dir]})</span><br>`;
+  }
+  stepsEl.innerHTML=html;
+}
+
+// ── Canvas events ────────────────────────────────────────────────────────
+canvas.addEventListener('click', e=>{
+  const [q,r]=s2h(e.clientX,e.clientY);
+  initialPose={...initialPose, pos:[q,r]};
+  update();
+});
+canvas.addEventListener('contextmenu', e=>{
+  e.preventDefault();
+  initialPose={...initialPose, dir:(initialPose.dir+1)%6};
+  updateDirBtns();
+  update();
+});
+
+// ── Resize ───────────────────────────────────────────────────────────────
+function resize(){
+  const header=document.querySelector('.board-header').offsetHeight||34;
+  const footer=document.querySelector('.board-footer').offsetHeight||28;
+  canvas.width =canvas.parentElement.clientWidth;
+  canvas.height=Math.max(60, canvas.parentElement.clientHeight-header-footer);
+  updateLayout(); draw();
+}
+window.addEventListener('resize',resize);
+
+// ── Direction buttons ─────────────────────────────────────────────────────
+function buildDirBtns(){
+  const cont=document.getElementById('dir-btns');
+  for(let i=0;i<6;i++){
+    const b=document.createElement('button');
+    b.className='dir-btn'; b.textContent=DIR_NAMES[i]; b.dataset.dir=i;
+    b.addEventListener('click',()=>{ initialPose={...initialPose,dir:i}; updateDirBtns(); update(); });
+    cont.appendChild(b);
+  }
+}
+function updateDirBtns(){
+  document.querySelectorAll('.dir-btn').forEach(b=>{
+    b.classList.toggle('active', parseInt(b.dataset.dir)===initialPose.dir);
+  });
+}
+
+// ── Palette ───────────────────────────────────────────────────────────────
+function buildPalette(){
+  const grid=document.getElementById('palette');
+  for(const meta of MOD_TYPES){
+    const card=document.createElement('div');
+    card.className='mod-card';
+    card.draggable=true;
+    card.dataset.modType=meta.type;
+    card.style.borderColor=meta.color+'50';
+    card.innerHTML=`<div class="card-type" style="color:${meta.color}">${meta.label}</div><div class="card-desc">${meta.desc}</div>`;
+    card.addEventListener('dragstart', e=>{ e.dataTransfer.setData('modType',meta.type); e.dataTransfer.effectAllowed='copy'; });
+    card.addEventListener('click',()=>addMod(meta.type));
+    grid.appendChild(card);
+  }
+}
+
+// ── Modifier CRUD ─────────────────────────────────────────────────────────
+function addMod(type){
+  const meta=MOD_META[type];
+  activeMods.push({ id:Math.random().toString(36).slice(2), type, ts:++tsCounter, ...JSON.parse(JSON.stringify(meta.defaults)) });
+  update();
+}
+function removeMod(id){ activeMods=activeMods.filter(m=>m.id!==id); update(); }
+function setParam(id,key,val){ const m=activeMods.find(m=>m.id===id); if(m){ m[key]=val; update(); } }
+
+// ── Render active modifier list ───────────────────────────────────────────
+function renderModList(){
+  const list=document.getElementById('modifier-list');
+  const hint=document.getElementById('drop-hint');
+  const countEl=document.getElementById('mod-count');
+
+  const sorted=[...activeMods].sort((a,b)=>{
+    const pd=MOD_META[a.type].priority-MOD_META[b.type].priority;
+    return pd!==0?pd:a.ts-b.ts;
+  });
+
+  list.querySelectorAll('.mod-item').forEach(el=>el.remove());
+  hint.style.display=sorted.length===0?'flex':'none';
+  countEl.textContent=`${sorted.length} modifier${sorted.length!==1?'s':''}`;
+
+  sorted.forEach((mod,idx)=>{
+    const meta=MOD_META[mod.type];
+    const item=document.createElement('div');
+    item.className='mod-item';
+    item.style.borderColor=meta.color+'35';
+
+    const dirOpts=DIR_NAMES.map((n,i)=>`<option value="${i}"${mod.dir===i?' selected':''}>${i}: ${n}</option>`).join('');
+
+    let params='';
+    switch(mod.type){
+      case 'RotateStatic': case 'RotateAroundCenter':
+        params=`<div class="param-row"><span class="param-label">rotations</span>
+          <input class="param-input" type="number" min="-5" max="5" value="${mod.rotations}" data-p="rotations">
+          <span style="font-size:8px;color:var(--muted)">CW (mod 6)</span></div>`;
+        break;
+      case 'MoveRelative': case 'MoveGlobal': case 'SetPosition':
+        params=`<div class="param-row"><span class="param-label">Q</span>
+          <input class="param-input" type="number" value="${mod.q}" data-p="q">
+          <span class="param-label" style="text-align:right">R</span>
+          <input class="param-input" type="number" value="${mod.r}" data-p="r"></div>`;
+        break;
+      case 'MultiplyVelocity':
+        params=`<div class="param-row"><span class="param-label">multiplier</span>
+          <input class="param-input" type="number" value="${mod.multiplier}" data-p="multiplier"></div>`;
+        break;
+      case 'SetRotation':
+        params=`<div class="param-row"><span class="param-label">direction</span>
+          <select class="param-select" data-p="dir">${dirOpts}</select></div>`;
+        break;
+      case 'SetPose':
+        params=`<div class="param-row"><span class="param-label">Q</span>
+          <input class="param-input" type="number" value="${mod.q}" data-p="q">
+          <span class="param-label" style="text-align:right">R</span>
+          <input class="param-input" type="number" value="${mod.r}" data-p="r"></div>
+          <div class="param-row"><span class="param-label">direction</span>
+          <select class="param-select" data-p="dir">${dirOpts}</select></div>`;
+        break;
+    }
+
+    item.innerHTML=`
+      <div class="mod-item-header" style="border-bottom:1px solid ${meta.color}25">
+        <span class="step-badge" style="color:${meta.color}">${idx+1}</span>
+        <span class="mod-item-type" style="color:${meta.color}">${meta.label}</span>
+        <button class="mod-item-remove">✕</button>
+      </div>
+      <div class="mod-item-params">${params}</div>`;
+
+    item.querySelector('.mod-item-remove').addEventListener('click',()=>removeMod(mod.id));
+    item.querySelectorAll('.param-input,.param-select').forEach(el=>{
+      el.addEventListener('input',()=>{
+        const key=el.dataset.p;
+        const val=el.tagName==='SELECT' ? parseInt(el.value) : parseFloat(el.value)||0;
+        setParam(mod.id,key,val);
+      });
+    });
+    list.appendChild(item);
+  });
+}
+
+// ── Drop zone ─────────────────────────────────────────────────────────────
+const dropZone=document.getElementById('modifier-list');
+dropZone.addEventListener('dragover',e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop',e=>{ e.preventDefault(); dropZone.classList.remove('drag-over'); const t=e.dataTransfer.getData('modType'); if(t) addMod(t); });
+
+// ── Main update ───────────────────────────────────────────────────────────
+function update(){ renderModList(); draw(); }
+
+// ── Init ─────────────────────────────────────────────────────────────────
+buildDirBtns();
+buildPalette();
+updateDirBtns();
+requestAnimationFrame(()=>requestAnimationFrame(resize));
+</script>
+</body>
+</html>

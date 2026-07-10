@@ -35,18 +35,27 @@ public  class MomentResolver{ //handles a single automatic moment resolution
     public GameEventSystem Events => _events;
     public EffectsTracker Effects => _effectsTracker;
 
+    public IntentsResolver Intents => _intentsResolver;
     public TimeStamp Now => _timeStampTracker.Now;
 
+    private HexPoseModifierFactory _hexPoseModifierFactory;
+    public HexPoseModifierFactory HexPoseModifierFactory => _hexPoseModifierFactory;
+
+    private StatEvaluator _statEvaluator;
+
+    public StatEvaluator StatEvaluator => _statEvaluator;
+
     public MomentResolver(MatchState matchState){
+        _timeStampTracker = new(); //TODO: Determine current timestamp based on gamestate
         _matchState = matchState;
         _events = new GameEventSystem();
-        _effectsTracker = new EffectsTracker(matchState, _events);
+        _statEvaluator = new StatEvaluator();
+        _effectsTracker = new EffectsTracker(matchState);
         _intentsResolver = new IntentsResolver();
         _zoneChangeResolver = new ZoneChangeResolver();
         _summoningResolver = new SummoningResolver();
-        _movementResolver = new MovementResolver(matchState, _events);
-        
-
+        _movementResolver = new MovementResolver(matchState, this);
+        _hexPoseModifierFactory = new(_timeStampTracker);
     }
 
     public void ResolveMoment(){
@@ -122,27 +131,26 @@ public class SummoningResolver
 public class MovementResolver{
 
     private MatchState _matchState;
-    private GameEventSystem _eventSystem;
-    private Dictionary<Unit, List<Modifier<HexTransform>>> _plannedMoves;
-    public MovementResolver(MatchState matchState, GameEventSystem eventSystem)
+    private MomentResolver _momentResolver;
+    private Dictionary<Unit, List<Modifier<HexPose>>> _plannedMoves = new();
+    public MovementResolver(MatchState matchState, MomentResolver momentResolver)
     {
         _matchState = matchState;
-        _eventSystem = eventSystem;
-        _eventSystem.MovementRequested += OnMovementRequested;
-    }
-
-    private void OnMovementRequested(Unit unit, HexTransform transform)
-    {
-        if (!_plannedMoves.ContainsKey(unit))
-        {
-            _plannedMoves[unit] = new();
-        }
-        // _plannedMoves[unit].Add(new HexTransformOffsetModifier(transform));
-        //I need to figure out how to pass timestamp data, as there is no main source of truth on that yet.
+        _momentResolver = momentResolver;
     }
 
     public bool ProcessMovement(MatchState matchState){
         throw new NotImplementedException();
+    }
+
+    public void RequestBasicMovement(Unit unit, HexDirection direction)
+    {
+        if (!_plannedMoves.ContainsKey(unit))
+        {
+            _plannedMoves[unit] = new();
+        }   
+        _plannedMoves[unit].Add(_momentResolver.HexPoseModifierFactory.RotateStatic((int) direction));
+        _plannedMoves[unit].Add(_momentResolver.HexPoseModifierFactory.MoveRelative(HexPosition.UnitVector(direction)));
     }
 }
 
@@ -153,11 +161,9 @@ public class ZoneChangeResolver{
 }
 
 public class EffectsTracker{
-    private GameEventSystem _events;
     private HashSet<Effect> _activeEffects;
     private HashSet<Effect> _queuedEffects;
-    public EffectsTracker(MatchState matchState, GameEventSystem events){
-        _events = events;
+    public EffectsTracker(MatchState matchState){
         _activeEffects = FindExistingEffects(matchState);
         _queuedEffects = new();
     }
@@ -175,16 +181,16 @@ public class EffectsTracker{
         if(_queuedEffects.Count == 0) return false;
         foreach(var effect in _queuedEffects){
             _activeEffects.Add(effect);
-            effect.Enable(_events);
+            effect.Enable();
         }
         _queuedEffects.Clear();
         return true;
     }
 
-    public void RemoveEffect(Effect effect, MatchState matchState){
+    public void RemoveEffect(Effect effect){
         if(!_activeEffects.Contains(effect)) throw new Exception("Trying to remove unregistered effect");
         _activeEffects.Remove(effect);
-        effect.Disable(_events);
+        effect.Disable();
     }
 }
 
@@ -213,15 +219,9 @@ public class IntentsResolver{
 }
 
 public class GameEventSystem{
-    public event Action<Unit, IList<Modifier<Health>>>? CollectingHealthModifiers;
     public event Action<Intent>? CollectingIntentDamage;
-    public event Action<Unit, IList<Modifier<HexTransform>>>? CollectIntentArea;
-    public event Action<Unit, HexTransform>? MovementRequested;
-
     public event Action<Intent>? DamageDone;
-    public void RaiseCollectingHealthModifiers(Unit unit, IList<Modifier<Health>> modifiers){
-        CollectingHealthModifiers?.Invoke(unit, modifiers);
-    }
+
     public void RaiseCollectIntentDamageModifiers(Intent intent){
         CollectingIntentDamage?.Invoke(intent);
     }
@@ -229,26 +229,33 @@ public class GameEventSystem{
     {
         DamageDone?.Invoke(intent);
     }
-    public void RequestMovement(Unit unit, HexTransform transform){
-        MovementRequested?.Invoke(unit, transform);
-    }
-
-    
-
-    
 }
 
-public class StatsEvaluator{
-    private readonly GameEventSystem _events;
 
-    public StatsEvaluator(GameEventSystem events){
-        _events = events;
+public class StatEvaluator
+{
+    public event Action<Unit, List<Modifier<Health>>>? HealthModifiersRequested;
+    public event Action<Unit, List<Modifier<int>>>? AttackModifiersRequested;
+    public event Action<Unit, List<Modifier<int>>>? SpeedModifiersRequested;
+
+    public List<Modifier<Health>> CollectHealthModifiers(Unit unit)
+    {
+        var modifiers = new List<Modifier<Health>>();
+        HealthModifiersRequested?.Invoke(unit, modifiers);
+        return modifiers;
     }
 
-    public Health CalculateHealth(Unit unit){
-        List<Modifier<Health>> modifiers = new();
-        _events.RaiseCollectingHealthModifiers(unit, modifiers);
-        modifiers.Sort();
-        return unit.Health.Evaluate(modifiers);
+    public List<Modifier<int>> CollectAttackModifiers(Unit unit)
+    {
+        var modifiers = new List<Modifier<int>>();
+        AttackModifiersRequested?.Invoke(unit, modifiers);
+        return modifiers;
+    }
+
+    public List<Modifier<int>> CollectSpeedModifiers(Unit unit)
+    {
+        var modifiers = new List<Modifier<int>>();
+        SpeedModifiersRequested?.Invoke(unit, modifiers);
+        return modifiers;
     }
 }
