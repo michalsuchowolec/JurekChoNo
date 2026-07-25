@@ -41,3 +41,11 @@ Note: Transform can't be an operation, because M1 * M2 * V1 != M2 * M1 * V1, it 
 Now meta modifiers that operate on intent:
     - double distance / root
 */
+
+// REEVALUATE: RotateStatic is currently one type/priority tier used for any static rotation, but the
+// pipeline above needs *two* distinct rotation stages (initial rotation, and a second rotation that
+// applies after the move) that can be disrupted independently by different effects. ModifierPriority.CompareTo
+// only reaches OperationPriority (== (int)Type here) as a tiebreaker below IsAura/TimeStamp, so two
+// RotateStatic modifiers meant for different stages currently have no way to sort relative to each other
+// on purpose. Needs either separate modifier types per rotation stage or a rethought priority scheme -
+// see the matching note on MovementResolver.RequestRelativeMovement.

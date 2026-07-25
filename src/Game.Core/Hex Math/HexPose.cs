@@ -2,6 +2,8 @@ public struct HexPose
 {
     public HexPosition Position;
     public HexDirection Direction;
+    public static HexPose Identity => new HexPose{Position = HexPosition.Identity, Direction = HexDirection.Up};
+    public int Magnitude => Position.Magnitude;
 
     public HexPose RotateClockWiseAroundCenter()
     {

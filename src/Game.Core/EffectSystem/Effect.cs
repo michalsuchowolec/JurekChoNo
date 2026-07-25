@@ -14,25 +14,25 @@ public class DamageEffect : Effect
     public EntityId TargetId;
     public int Damage;
     public TimeStamp TimeStamp;
-    private readonly StatEvaluator _statEvaluator;
+    private readonly EventBus _events;
 
-    public DamageEffect(EntityId targetId, int damage, TimeStamp timeStamp, StatEvaluator statEvaluator){
+    public DamageEffect(EntityId targetId, int damage, TimeStamp timeStamp, EventBus events){
         TargetId = targetId;
         Damage = damage;
         TimeStamp = timeStamp;
-        _statEvaluator = statEvaluator;
+        _events = events;
     }
     public override void Enable()
     {
-        _statEvaluator.HealthModifiersRequested += ProvideModifier;
+        _events.Subscribe<HealthModifiersRequested>(ProvideModifier);
     }
     public override void Disable()
     {
-        _statEvaluator.HealthModifiersRequested -= ProvideModifier;
+        _events.Unsubscribe<HealthModifiersRequested>(ProvideModifier);
     }
-    private void ProvideModifier(Unit unit, List<Modifier<Health>> modifiers){
-        if(unit.Id == TargetId){
-            modifiers.Add(new DamageModifier(Damage, TimeStamp, false));
+    private void ProvideModifier(HealthModifiersRequested request){
+        if(request.Owner.Id == TargetId){
+            request.Modifiers.Add(new DamageModifier(Damage, TimeStamp, false));
         }
     }
 }
@@ -43,27 +43,27 @@ public class HealthAOEAura : Effect
     public Unit Source;
     public List<HexPosition> Area;
     public int Health;
-    private readonly StatEvaluator _statEvaluator;
+    private readonly EventBus _events;
 
-    public HealthAOEAura(Unit unit, int health, List<HexPosition> area, StatEvaluator statEvaluator){
+    public HealthAOEAura(Unit unit, int health, List<HexPosition> area, EventBus events){
         Source = unit;
         Health = health;
         Area = area;
-        _statEvaluator = statEvaluator;
+        _events = events;
     }
     public override void Disable()
     {
-        _statEvaluator.HealthModifiersRequested -= ProvideModifier;
+        _events.Unsubscribe<HealthModifiersRequested>(ProvideModifier);
     }
 
     public override void Enable()
     {
-        _statEvaluator.HealthModifiersRequested += ProvideModifier;
+        _events.Subscribe<HealthModifiersRequested>(ProvideModifier);
     }
 
-    private void ProvideModifier(Unit unit, List<Modifier<Health>> modifiers){
-        if(DoesOverlap(unit)){
-            modifiers.Add(new BuffModifier(Health, new(), true));
+    private void ProvideModifier(HealthModifiersRequested request){
+        if(DoesOverlap(request.Owner)){
+            request.Modifiers.Add(new BuffModifier(Health, new(), true));
         }
     }
 
@@ -78,9 +78,9 @@ public class HealthAOEAura : Effect
 public class DOTEffect : Effect{
     private Unit _unit;
     private int _damage;
-    private readonly GameEventSystem _events;
+    private readonly EventBus _events;
 
-    public DOTEffect(Unit unit, int damage, GameEventSystem events){
+    public DOTEffect(Unit unit, int damage, EventBus events){
         _unit = unit;
         _damage = damage;
         _events = events;

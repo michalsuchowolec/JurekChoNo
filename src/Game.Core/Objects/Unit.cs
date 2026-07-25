@@ -2,27 +2,55 @@ using Game.Core;
 using MatchEngine;
 
 
-public class Unit{
+public class Unit : IDamagable{
     public readonly EntityId Id;
-    private readonly MomentResolver _resolver;
-    private readonly HealthStat _health = new(100);
-    private readonly IntStat _speed = new(3);
-    private readonly IntStat _attack = new(5);
-    public readonly HexPoseStat CurrentPose = new(new HexPose());
+    private readonly EventBus _events;
+    private readonly Stat<Health> _health = new(new Health(100));
+    private readonly Stat<int> _speed = new(3);
+    private readonly Stat<int> _attack = new(5);
+    public  HexPose Pose = HexPose.Identity;
     private List<Effect> _effects = new();
     public Player Owner;
     private List<CollisionBehaviour> _collisionBehaviours;
+    public UnitZone Zone;
 
+    private Stat<HexArea> _collisionArea = new(HexArea.Circle(0)); //colossal
+    private Stat<HexArea> _enemyCollisionArea = new(HexArea.Circle(0)); //taunt
 
-    public Unit(EntityId id, MomentResolver resolver){
+    private Stat<bool> _canExhaust = new(false);
+    public bool IsExhausted = false;
+    public bool IsAlive => Zone == UnitZone.Board;
+    public Unit(EntityId id, EventBus events){
         Id = id;
-        _resolver = resolver;
+        _events = events;
     }
 
-    public Health Health => _health.Evaluate(_resolver.StatEvaluator.CollectHealthModifiers(this));
-    public int Attack => _attack.Evaluate(_resolver.StatEvaluator.CollectAttackModifiers(this));
-    public int Speed => _speed.Evaluate(_resolver.StatEvaluator.CollectSpeedModifiers(this));
-    public HexPose Pose => CurrentPose.Evaluate([]);
+    public Health Health {
+        get {
+            var request = new HealthModifiersRequested(this);
+            _events.Publish(request);
+            return _health.Evaluate(request.Modifiers);
+        }
+    }
+    public int Attack {
+        get {
+            var request = new AttackModifiersRequested(this);
+            _events.Publish(request);
+            return _attack.Evaluate(request.Modifiers);
+        }
+    }
+    public int Speed {
+        get {
+            var request = new SpeedModifiersRequested(this);
+            _events.Publish(request);
+            return _speed.Evaluate(request.Modifiers);
+        }
+    }
+    public HexArea CollisionArea => _collisionArea.Evaluate(new()); //TODO
+    public HexArea EnemyCollisionArea => _enemyCollisionArea.Evaluate(new()); //TODO
+    public bool CanExhaust => _canExhaust.Evaluate(new()); //TODO
+
+    EntityId IDamagable.Id { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     public void AddEffect(Effect effect){
         _effects.Add(effect);
@@ -38,19 +66,27 @@ public class Unit{
             }
         }
     }
+
+    public void TakeDamage(int amount)
+    {
+        throw new NotImplementedException();
+    }
+
 }
 
 
-public class Player
+
+public enum UnitZone
 {
-
+    Board, //behaves as unit on board.
+    Card //when moved elsewhere turns back into card.
+    
+    //Maybe some other possible states. 
 }
 
 
-public class CollisionResolver
-{
 
-}
+
 
 public abstract class CollisionBehaviour
 {
@@ -85,6 +121,8 @@ public class BasicAttackBehaviour : CollisionBehaviour
     }
     public override void Perform(Unit user, Unit target)
     {
-        _momentResolver.Intents.QueueIntent(new DealDamageIntent(user, target, user.Attack));
+        var selector = new SingleUnitSelector(target);
+        var evaluator = new BasicDamageEvaluator(_momentResolver.Events, user.Attack);
+        _momentResolver.Intents.QueueIntent(new DamageIntent(_momentResolver.Events, selector, evaluator));
     }
 }

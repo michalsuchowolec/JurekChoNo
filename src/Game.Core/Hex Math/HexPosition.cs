@@ -13,6 +13,12 @@ public struct HexPosition
     public int Q;
     public int R;
 
+    public int Magnitude => new int[]
+    {
+        Math.Abs(Q) + Math.Abs(R), //QR combination
+        Math.Abs(Q + R) + Math.Abs(R), //QS combination
+        Math.Abs(Q + R) + Math.Abs(Q) //RS combination
+    }.Min();
     public HexPosition RotateClockWiseAroundCenter()
     {
         return new HexPosition
@@ -52,12 +58,22 @@ public struct HexPosition
         return result.Offset(origin.Position);
     }
 
+
     public static HexPosition operator +(HexPosition a, HexPosition b)
     {
         return new HexPosition
         {
             Q = a.Q + b.Q,
             R = a.R + b.R  
+        };
+    }
+
+    public static HexPosition operator -(HexPosition a, HexPosition b)
+    {
+        return new HexPosition
+        {
+            Q = a.Q - b.Q, 
+            R = a.R - b.R
         };
     }
 

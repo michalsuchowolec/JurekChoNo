@@ -14,8 +14,7 @@ public class MatchRoot{
 
 public class MatchState{
     public TimeStampTracker TimeStampTracker = new();
-    
-
+    public Board Board = new Board(HexArea.Circle(7));
 
 }
 
