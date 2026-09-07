@@ -4,28 +4,10 @@ using System.Reflection.Metadata.Ecma335;
 using Game.Core;
 using MatchEngine;
 
-public class MatchRoot{
-    public MatchState MatchState;
-    public MomentResolver? MomentResolver;
-
-}
 
 
 
-public class MatchState{
-    public TimeStampTracker TimeStampTracker = new();
-    public Board Board = new Board(HexArea.Circle(7));
 
-}
-
-
-
-public enum StatOwner{
-    Unit,
-    Tile,
-    Intent,
-    Effect
-}
 
 
 

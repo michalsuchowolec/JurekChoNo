@@ -9,6 +9,10 @@ public struct HexPosition
     public static HexPosition Down = new HexPosition{Q = 0, R = -1};
     public static HexPosition DownLeft = new(){Q = -1, R = 0};
     public static HexPosition UpLeft = new(){Q = -1, R = 1};
+    public static IEnumerable<HexPosition> UnitVectors => new List<HexPosition>
+    {
+        Up, UpRight, DownRight, Down, DownLeft, UpLeft
+    };
 
     public int Q;
     public int R;

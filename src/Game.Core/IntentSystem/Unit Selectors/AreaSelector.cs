@@ -10,23 +10,22 @@ public class AreaSelector : UnitSelector
     private HexArea _area;
     public HexArea Area => _area;
 
-    private Board _board;
-    public Board Board => _board;
+    // Needs both the board and events - rather than collecting the two separately, it just asks
+    // the moment for both, same as CollisionBehaviour does.
+    private MomentResolver _momentResolver;
+    public Board Board => _momentResolver.MatchRoot.MatchState.Board;
+    public EventBus Events => _momentResolver.Events;
 
-    private EventBus _events;
-    public EventBus Events => _events;
-
-    public AreaSelector(HexArea area, Board board, EventBus events)
+    public AreaSelector(HexArea area, MomentResolver momentResolver)
     {
         _area = area;
-        _board = board;
-        _events = events;
+        _momentResolver = momentResolver;
     }
 
     public override List<Unit> FindTargets()
     {
         var request = new CollectingHexAreaModifiers(this);
-        _events.Publish(request);
-        return _board.GetUnitsAt(Stat<HexArea>.Evaluate(_area, request.Modifiers));
+        Events.Publish(request);
+        return Board.GetUnitsAt(Stat<HexArea>.Evaluate(_area, request.Modifiers));
     }
 }

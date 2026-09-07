@@ -4,12 +4,19 @@ public enum CardsContainerPriority
 {
     Hand,
     Deck,
-    DiscardPile
+    DiscardPile,
+    PreparationZone
 }
 
 public abstract class CardsContainer : IComparable<CardsContainer>
 {
+    protected CardsContainer(Player owner)
+    {
+        Owner = owner;
+    }
+
     public abstract void Add(Card card);
+    public abstract void Remove(Card card);
     public Player Owner{get;}
     public abstract CardsContainerPriority Priority { get; }
 
@@ -30,29 +37,63 @@ public abstract class CardsContainer : IComparable<CardsContainer>
 }
 public class DiscardPile : CardsContainer
 {
+    public DiscardPile(Player owner) : base(owner) { }
     public override CardsContainerPriority Priority => CardsContainerPriority.DiscardPile;
     public override void Add(Card card)
     {
         throw new NotFiniteNumberException();
     }
+
+    public override void Remove(Card card)
+    {
+        throw new NotImplementedException();
+    }
+
 }
 
 public class Hand : CardsContainer
 {
+    public Hand(Player owner) : base(owner) { }
     public override CardsContainerPriority Priority => CardsContainerPriority.Hand;
     public override void Add(Card card)
     {
         throw new NotImplementedException();
     }
 
+    public override void Remove(Card card)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 public class Deck : CardsContainer
 {
+    public Deck(Player owner) : base(owner) { }
     public override CardsContainerPriority Priority => CardsContainerPriority.Deck;
     public override void Add(Card card)
     {
         throw new NotImplementedException();
     }
 
+    public override void Remove(Card card)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+
+public class PreparationZone : CardsContainer
+{
+    public PreparationZone(Player owner) : base(owner){}
+    public override CardsContainerPriority Priority => CardsContainerPriority.PreparationZone;
+
+    public override void Add(Card card)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override void Remove(Card card)
+    {
+        throw new NotImplementedException();
+    }
 }

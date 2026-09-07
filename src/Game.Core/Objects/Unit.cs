@@ -2,7 +2,7 @@ using Game.Core;
 using MatchEngine;
 
 
-public class Unit : IDamagable{
+public class Unit : IDamagable, IEffectsOwner{
     public readonly EntityId Id;
     private readonly EventBus _events;
     private readonly Stat<Health> _health = new(new Health(100));
@@ -10,10 +10,11 @@ public class Unit : IDamagable{
     private readonly Stat<int> _attack = new(5);
     public  HexPose Pose = HexPose.Identity;
     private List<Effect> _effects = new();
+    public IEnumerable<Effect> Effects => _effects;
     public Player Owner;
     private List<CollisionBehaviour> _collisionBehaviours;
     public UnitZone Zone;
-
+    public string Template;
     private Stat<HexArea> _collisionArea = new(HexArea.Circle(0)); //colossal
     private Stat<HexArea> _enemyCollisionArea = new(HexArea.Circle(0)); //taunt
 
@@ -23,6 +24,7 @@ public class Unit : IDamagable{
     public Unit(EntityId id, EventBus events){
         Id = id;
         _events = events;
+        _collisionBehaviours = new();
     }
 
     public Health Health {
@@ -52,6 +54,7 @@ public class Unit : IDamagable{
 
     EntityId IDamagable.Id { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
+
     public void AddEffect(Effect effect){
         _effects.Add(effect);
     }
@@ -67,6 +70,11 @@ public class Unit : IDamagable{
         }
     }
 
+    public bool CanMove(int Initiative)
+    {
+        return !IsExhausted && Speed >= Initiative;
+    }
+
     public void TakeDamage(int amount)
     {
         throw new NotImplementedException();
@@ -74,7 +82,7 @@ public class Unit : IDamagable{
 
 }
 
-
+public record PlansToMoveRequested();
 
 public enum UnitZone
 {

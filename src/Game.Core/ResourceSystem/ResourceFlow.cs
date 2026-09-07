@@ -5,13 +5,13 @@ public class ResourceFlow
     private ResourceNode _source = new();
     private ResourceNode _sink = new();
 
-    private ResourceFlow(Budget budget, Cost cost)
+    private ResourceFlow(ResourceBundle budget, ResourceBundle cost)
     {
-        _budget = budget.Bundle;
-        _cost = cost.Bundle;
+        _budget = budget;
+        _cost = cost;
     }
 
-    public static bool CanAfford(Budget budget, Cost cost)
+    public static bool CanAfford(ResourceBundle budget, ResourceBundle cost)
     {
         var flow = new ResourceFlow(budget, cost);
         return flow.CanAfford();

@@ -14,14 +14,16 @@ public abstract class MoveIntent : Intent
     protected PoseEvaluator _poseEvaluator;
     public PoseEvaluator PoseEvaluator => _poseEvaluator;
 
-    protected MovementResolver _movementResolver;
-    public MovementResolver MovementResolver => _movementResolver;
+    // Needs both Events (for base Intent) and MovementResolver - rather than collecting the two
+    // separately, it just asks the moment for both, same as CollisionBehaviour does.
+    protected MomentResolver _momentResolver;
+    public MovementResolver MovementResolver => _momentResolver.MovementResolver;
 
-    public MoveIntent(EventBus events, UnitSelector unitSelector, PoseEvaluator poseEvaluator, MovementResolver movementResolver) : base(events)
+    public MoveIntent(MomentResolver momentResolver, UnitSelector unitSelector, PoseEvaluator poseEvaluator) : base(momentResolver.Events)
     {
+        _momentResolver = momentResolver;
         _unitSelector = unitSelector;
         _poseEvaluator = poseEvaluator;
-        _movementResolver = movementResolver;
         unitSelector.Source = this;
         poseEvaluator.Source = this;
     }
@@ -42,15 +44,15 @@ public abstract class MoveIntent : Intent
 public record BasicMoveDone(BasicMoveIntent BasicMoveIntent);
 public class BasicMoveIntent : MoveIntent
 {
-    public BasicMoveIntent(EventBus events, UnitSelector unitSelector, PoseEvaluator poseEvaluator, MovementResolver movementResolver)
-        : base(events, unitSelector, poseEvaluator, movementResolver)
+    public BasicMoveIntent(MomentResolver momentResolver, UnitSelector unitSelector, PoseEvaluator poseEvaluator)
+        : base(momentResolver, unitSelector, poseEvaluator)
     {
     }
 
     protected override void RequestMovement(Unit target)
     {
         var offset = _poseEvaluator.EvaluatePose(target);
-        _movementResolver.RequestBasicMovement(target, offset.Direction);
+        MovementResolver.RequestBasicMovement(target, offset.Direction);
     }
 
     protected override void PublishEvent()
@@ -62,15 +64,15 @@ public class BasicMoveIntent : MoveIntent
 public record PushDone(PushIntent PushIntent);
 public class PushIntent : MoveIntent
 {
-    public PushIntent(EventBus events, UnitSelector unitSelector, PoseEvaluator poseEvaluator, MovementResolver movementResolver)
-        : base(events, unitSelector, poseEvaluator, movementResolver)
+    public PushIntent(MomentResolver momentResolver, UnitSelector unitSelector, PoseEvaluator poseEvaluator)
+        : base(momentResolver, unitSelector, poseEvaluator)
     {
     }
 
     protected override void RequestMovement(Unit target)
     {
         var offset = _poseEvaluator.EvaluatePose(target);
-        _movementResolver.RequestPush(target, offset.Position);
+        MovementResolver.RequestPush(target, offset.Position);
     }
 
     protected override void PublishEvent()
@@ -82,15 +84,15 @@ public class PushIntent : MoveIntent
 public record TeleportDone(TeleportIntent TeleportIntent);
 public class TeleportIntent : MoveIntent
 {
-    public TeleportIntent(EventBus events, UnitSelector unitSelector, PoseEvaluator poseEvaluator, MovementResolver movementResolver)
-        : base(events, unitSelector, poseEvaluator, movementResolver)
+    public TeleportIntent(MomentResolver momentResolver, UnitSelector unitSelector, PoseEvaluator poseEvaluator)
+        : base(momentResolver, unitSelector, poseEvaluator)
     {
     }
 
     protected override void RequestMovement(Unit target)
     {
         var destination = _poseEvaluator.EvaluatePose(target);
-        _movementResolver.RequestTeleport(target, destination);
+        MovementResolver.RequestTeleport(target, destination);
     }
 
     protected override void PublishEvent()

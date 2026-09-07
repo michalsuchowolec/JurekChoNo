@@ -8,13 +8,16 @@ public class EffectsTracker{
         _queuedEffects = new();
     }
 
+    // TODO: once matches can start mid-state (e.g. loaded from a save), collect whatever
+    // effects are already active on matchState's units/cards. A freshly-created match has none.
     private HashSet<Effect> CollectEffects(MatchState matchState)
     {
-        throw new NotFiniteNumberException();
+        return new HashSet<Effect>();
     }
 
-    public void QueueEffect(Effect effect){
+    public void QueueEffect(Effect effect, IEffectsOwner owner){
         _queuedEffects.Add(effect);
+        owner.AddEffect(effect);
     }
 
     public bool RealizeEffects(){

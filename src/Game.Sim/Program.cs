@@ -5,9 +5,7 @@ using System.Text;
 using MatchEngine;
 
 
-var board = new Board(HexArea.Circle(7));
-var hexPoseModifierFactory = new HexPoseModifierFactory(new TimeStampTracker());  
-var movementResolver = new MovementResolver(board, hexPoseModifierFactory);
+var matchRoot = new MatchRoot(new List<InitialPlayerData> { new(new List<string>()), new(new List<string>()) });
 
 Console.WriteLine("hello world");
 

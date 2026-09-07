@@ -1,14 +1,16 @@
 namespace MatchEngine;
 public class MovementResolver{
 
-    private Board _board;
-    private HexPoseModifierFactory _hexPoseModifierFactory;
+    // Needs both the board and this moment's pose-modifier factory - neither is a single manager
+    // on its own, so it holds the owning MomentResolver instead of collecting the two separately.
+    private readonly MomentResolver _momentResolver;
+    private Board Board => _momentResolver.MatchRoot.MatchState.Board;
+    private HexPoseModifierFactory HexPoseModifierFactory => _momentResolver.HexPoseModifierFactory;
     private Dictionary<Unit, List<Modifier<HexPose>>> _plannedMoves = new();
     private Dictionary<Unit, List<Unit>> _collisions = new();
-    public MovementResolver(Board board, HexPoseModifierFactory hexPoseModifierFactory)
+    public MovementResolver(MomentResolver momentResolver)
     {
-        _board = board;
-        _hexPoseModifierFactory = hexPoseModifierFactory;
+        _momentResolver = momentResolver;
     }
 
     public bool ProcessMovement(){
@@ -33,12 +35,13 @@ public class MovementResolver{
         foreach(var unit in _collisions.Keys)
         {
             var destinationPose = FindDestinationPose(unit);
-            if(_collisions[unit].Count == 0 && _board.IsInBounds(destinationPose * unit.CollisionArea))
+            if(_collisions[unit].Count == 0 && Board.IsInBounds(destinationPose * unit.CollisionArea))
             {
-                _board.Move(unit, unit.Pose, FindDestinationPose(unit));    
+                Board.Move(unit, unit.Pose, FindDestinationPose(unit));
             }
             _plannedMoves.Remove(unit);
         }
+        _collisions.Clear(); // otherwise this stays non-empty and ProcessMovement() never returns false again
         return true;
     }
 
@@ -47,7 +50,7 @@ public class MovementResolver{
         if(_plannedMoves.Count == 0) return false;
         foreach(var unit in _plannedMoves.Keys)
         {
-            _board.Move(unit, unit.Pose, FindDestinationPose(unit));
+            Board.Move(unit, unit.Pose, FindDestinationPose(unit));
             _plannedMoves.Remove(unit);
         }
         return true;
@@ -70,7 +73,7 @@ public class MovementResolver{
     private void FindCollisions()
     {
         _collisions.Clear();
-        var units = _board.Units;
+        var units = Board.Units;
         for(int i = 0; i < units.Count - 1; i++)
         {
             for(int j = i + 1; j < units.Count; j++)
@@ -107,6 +110,7 @@ public class MovementResolver{
 
     private bool DoUnitsOverlapAfterMovement(Unit a, Unit b)
     {
+        if(!_plannedMoves.ContainsKey(a) || !_plannedMoves.ContainsKey(b)) return false; //both units need to move
         var aMovement = Stat<HexPose>.Evaluate(HexPose.Identity, _plannedMoves[a]);
         var bMovement = Stat<HexPose>.Evaluate(HexPose.Identity, _plannedMoves[b]);
         var aDestinationOrigin = a.Pose * aMovement;
@@ -116,8 +120,8 @@ public class MovementResolver{
         return aDestinationArea.Overlaps(bDestinationArea);
     }
     private void MoveUnit(Unit unit)
-    {   
-        _board.Move(
+    {
+        Board.Move(
             unit,
             unit.Pose.Position,
             unit.Pose * Stat<HexPose>.Evaluate(HexPose.Identity, _plannedMoves[unit])  //I'm not sure which part is transformation and which position
@@ -148,8 +152,8 @@ public class MovementResolver{
         }
         var newDirection = (HexDirection)(((int) unit.Pose.Direction + clockwiseRotations) % 6);
         var globalOffset = HexPosition.Transform(new HexPose { Position = HexPosition.Identity, Direction = newDirection }, localOffset);
-        _plannedMoves[unit].Add(_hexPoseModifierFactory.RotateStatic(clockwiseRotations));
-        _plannedMoves[unit].Add(_hexPoseModifierFactory.MoveGlobal(globalOffset));
+        _plannedMoves[unit].Add(HexPoseModifierFactory.RotateStatic(clockwiseRotations));
+        _plannedMoves[unit].Add(HexPoseModifierFactory.MoveGlobal(globalOffset));
     }
 
     public void RequestBasicMovement(Unit unit, HexDirection direction)
