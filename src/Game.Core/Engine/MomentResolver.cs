@@ -52,8 +52,7 @@ public class MomentResolver{ //handles a single automatic moment resolution
             if(Effects.RealizeEffects()) continue;
             if(_intentsResolver.RealizeIntents()) continue;
             if(_zoneChangeResolver.ProcessZoneChanges()) continue;
-            if(_summoningResolver.ProcessSummons()) continue;
-
+            if(_summoningResolver.ProcessSummons()) continue; //Should it be here, or at the end? 
             if(_movementResolver.ProcessMovement()) continue;
             break;
         }
